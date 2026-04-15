@@ -41,7 +41,6 @@ EXPENSE_SCHEMA: dict[str, Any] = {
         },
     },
     "required": ["amount", "category", "description"],
-    "additionalProperties": False,
 }
 
 SYSTEM_PROMPT = (

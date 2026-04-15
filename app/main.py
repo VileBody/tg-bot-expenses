@@ -12,7 +12,7 @@ from aiogram.enums import ParseMode
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message
 
-from app.bot_utils import build_error_message, build_saved_message, build_start_message, is_command
+from app.bot_utils import build_saved_message, build_start_message, is_command
 from app.config import Settings
 from app.google_docs_utils import GoogleDocsUtils, GoogleSheetConfig
 from app.llm_clients import ModelValidationError, TransientProviderError, build_llm_router
@@ -86,17 +86,18 @@ async def run_queue_worker(
                     notify_exc,
                 )
         except ModelValidationError as exc:
-            await queue.mark_failed(item.row_id, str(exc))
+            delay = _pipeline_backoff_seconds(
+                item.attempts,
+                settings.retry_backoff_base_seconds,
+                settings.pipeline_retry_max_backoff_seconds,
+            )
+            await queue.schedule_retry(item.row_id, delay, str(exc))
             logger.warning(
-                "Queue item failed by model validation row_id=%s chat_id=%s: %s",
+                "Queue item model validation retry row_id=%s delay=%ss error=%s",
                 item.row_id,
-                item.chat_id,
+                delay,
                 exc,
             )
-            try:
-                await bot.send_message(chat_id=item.chat_id, text=build_error_message())
-            except Exception:  # noqa: BLE001
-                logger.warning("Failed to send validation error notice chat_id=%s", item.chat_id)
         except Exception as exc:  # noqa: BLE001
             delay = _pipeline_backoff_seconds(
                 item.attempts,
