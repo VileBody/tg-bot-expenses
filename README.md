@@ -1,7 +1,7 @@
 # tgbot-finances
 
 Минималистичный Telegram-бот для учета расходов:
-- polling (без webhook)
+- Telegram Bot API polling (aiogram)
 - Gemini SDK
 - structured output (SO) для извлечения полей расхода
 - append в Google Sheets с проверкой/добавлением хедеров
@@ -14,7 +14,7 @@
 
 - `app/main.py` - запуск бота и polling
 - `app/llm_clients.py` - Gemini + метод `recognize_with_calling`
-- `app/proxy_utils.py` - прокси для Telethon и Gemini
+- `app/proxy_utils.py` - прокси для Bot API и Gemini
 - `app/google_docs_utils.py` - утилиты Google Docs/Sheets
 - `app/bot_utils.py` - форматирование ответов для Telegram
 - `app/config.py` - чтение `.env`
@@ -22,12 +22,11 @@
 
 ## Что нужно подготовить
 
-1. Telegram bot token
-2. `TELEGRAM_API_ID` и `TELEGRAM_API_HASH` (для Telethon)
-3. Google Sheet URL
-4. Service Account JSON файл Google (с доступом Editor к таблице)
-5. Gemini API key
-6. (Опционально) `OUTBOUND_PROXY` вида `socks5://user:pass@host:port`
+1. Telegram bot token (`@BotFather`)
+2. Google Sheet URL
+3. Service Account JSON файл Google (с доступом Editor к таблице)
+4. Gemini API key
+5. (Опционально) `OUTBOUND_PROXY` вида `http://user:pass@host:port`
 
 ## Быстрый старт в Docker
 
@@ -70,7 +69,6 @@ python -m app.main
 sudo mkdir -p /opt/tgbot-finances
 sudo chown -R $USER:$USER /opt/tgbot-finances
 cd /opt/tgbot-finances
-# сюда копируешь проект
 ```
 
 ### One-liner: закинуть `.env` на сервер
@@ -109,8 +107,8 @@ ssh -i ~/.ssh/id_ed25519 ubuntu@SERVER_IP "cd /opt/tgbot-finances && docker comp
 ## Как работает запись в таблицу
 
 При входящем сообщении:
-1. текст отправляется в LLM с SO/calling
-2. извлекаются поля: `amount`, `category`, `description`, `currency`, `expense_date`
+1. сообщение кладется в локальную очередь SQLite
+2. worker забирает задачу и отправляет текст в Gemini с SO/calling
 3. перед append проверяется первая строка (хедеры)
 4. добавляется новая строка с колонками:
    - `created_date_msk`
@@ -124,12 +122,14 @@ ssh -i ~/.ssh/id_ed25519 ubuntu@SERVER_IP "cd /opt/tgbot-finances && docker comp
    - `llm_provider`
    - `llm_model`
    - `confidence`
+   - `tg_message_key`
+   - `tg_chat_id`
+   - `tg_message_id`
 
 ## Важные примечания
 
-- Если задан `OUTBOUND_PROXY`, и Telethon, и Gemini используют его для исходящих запросов.
-- Порядок обработки: `сообщение -> Gemini -> (успех) -> запись в Google Sheets`.
-- Сначала сообщение кладется в локальную очередь, затем worker обрабатывает: `очередь -> Gemini -> (успех) -> Google Sheets`.
+- Если задан `OUTBOUND_PROXY`, и Bot API, и Gemini используют его для исходящих запросов.
+- Порядок обработки: `очередь -> Gemini -> (успех) -> Google Sheets`.
 - При перезапуске процесса элементы со статусом `processing` возвращаются в `pending` и дообрабатываются.
 - На временных ошибках Gemini (429/503/timeout) и Google Sheets включен exponential backoff.
 - Количество попыток настраивается в `.env`:
@@ -138,5 +138,5 @@ ssh -i ~/.ssh/id_ed25519 ubuntu@SERVER_IP "cd /opt/tgbot-finances && docker comp
   - `GOOGLE_APPEND_RETRIES` (по умолчанию 4)
   - `RETRY_BACKOFF_BASE_SECONDS` (по умолчанию 2, значит 2/4/8/16)
   - `PIPELINE_RETRY_MAX_BACKOFF_SECONDS` (потолок задержки между повторными попытками очереди)
-- В `GOOGLE_SHEET_URL` можно хранить полную ссылку на таблицу - это нормальный вариант.
+- В `GOOGLE_SHEET_URL` можно хранить полную ссылку на таблицу.
 - Для безопасности не коммить `.env` и `secrets/`.

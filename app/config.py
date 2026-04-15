@@ -35,9 +35,6 @@ def _read_chat_ids(raw: str | None) -> set[int]:
 @dataclass(slots=True)
 class Settings:
     telegram_bot_token: str
-    telegram_api_id: int
-    telegram_api_hash: str
-    telethon_session_path: str
     outbound_proxy: str | None
 
     google_sheet_url: str
@@ -65,16 +62,10 @@ class Settings:
         load_dotenv(override=False)
 
         token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-        api_id_raw = os.getenv("TELEGRAM_API_ID", "").strip()
-        api_hash = os.getenv("TELEGRAM_API_HASH", "").strip()
 
         missing: list[str] = []
         if not token:
             missing.append("TELEGRAM_BOT_TOKEN")
-        if not api_id_raw:
-            missing.append("TELEGRAM_API_ID")
-        if not api_hash:
-            missing.append("TELEGRAM_API_HASH")
 
         sheet_url = os.getenv("GOOGLE_SHEET_URL", "").strip()
         service_file = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "").strip()
@@ -94,9 +85,6 @@ class Settings:
 
         return cls(
             telegram_bot_token=token,
-            telegram_api_id=int(api_id_raw),
-            telegram_api_hash=api_hash,
-            telethon_session_path=os.getenv("TELETHON_SESSION_PATH", "data/tg-bot.session").strip(),
             outbound_proxy=outbound_proxy,
             google_sheet_url=sheet_url,
             google_worksheet_name=os.getenv("GOOGLE_WORKSHEET_NAME", "Расходы").strip(),
