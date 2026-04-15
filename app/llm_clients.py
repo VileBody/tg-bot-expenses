@@ -100,8 +100,8 @@ class GeminiExpenseClient:
 
     async def recognize_with_calling(self, text: str, now_msk: datetime) -> dict[str, Any]:
         prompt = (
-            f"{SYSTEM_PROMPT}\\n"
-            f"Текущая дата по Москве: {now_msk.strftime('%Y-%m-%d')}\\n"
+            f"{SYSTEM_PROMPT}\n"
+            f"Текущая дата по Москве: {now_msk.strftime('%Y-%m-%d')}\n"
             f"Текст пользователя: {text}"
         )
 
